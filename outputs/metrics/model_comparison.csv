@@ -1,0 +1,4 @@
+model,MAE,RMSE,WAPE
+seasonal_naive,5.1298,8.1262,60.6702
+xgboost,4.1995,6.4964,49.6676
+lstm,4.0829,6.3011,48.2887

@@ -1,0 +1,142 @@
+{
+  "chosen_params": {
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "min_child_weight": 5
+  },
+  "n_estimators_final": 117,
+  "tuning": [
+    {
+      "params": {
+        "max_depth": 4,
+        "learning_rate": 0.05,
+        "min_child_weight": 5
+      },
+      "best_iteration": 109,
+      "val": {
+        "MAE": 4.348652590156863,
+        "RMSE": 6.687443833427237,
+        "WAPE": 52.35669126892898
+      }
+    },
+    {
+      "params": {
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "min_child_weight": 5
+      },
+      "best_iteration": 106,
+      "val": {
+        "MAE": 4.337260650800019,
+        "RMSE": 6.799058548720022,
+        "WAPE": 52.21953516379179
+      }
+    },
+    {
+      "params": {
+        "max_depth": 8,
+        "learning_rate": 0.03,
+        "min_child_weight": 10
+      },
+      "best_iteration": 134,
+      "val": {
+        "MAE": 4.342741113396548,
+        "RMSE": 6.791271927888591,
+        "WAPE": 52.285518564909395
+      }
+    }
+  ],
+  "splits": {
+    "train_end": "2016-02-28",
+    "val_start": "2016-02-29",
+    "val_end": "2016-03-27",
+    "test_start": "2016-03-28",
+    "test_end": "2016-04-24"
+  },
+  "feature_importance": [
+    {
+      "feature": "roll_mean_28",
+      "importance": 0.30274
+    },
+    {
+      "feature": "roll_mean_7",
+      "importance": 0.16312
+    },
+    {
+      "feature": "cat_id_code",
+      "importance": 0.12143
+    },
+    {
+      "feature": "lag_28",
+      "importance": 0.08162
+    },
+    {
+      "feature": "dow",
+      "importance": 0.04548
+    },
+    {
+      "feature": "lag_35",
+      "importance": 0.03245
+    },
+    {
+      "feature": "item_id_code",
+      "importance": 0.0283
+    },
+    {
+      "feature": "roll_zero_share_28",
+      "importance": 0.02767
+    },
+    {
+      "feature": "roll_std_28",
+      "importance": 0.02552
+    },
+    {
+      "feature": "dept_id_code",
+      "importance": 0.02549
+    },
+    {
+      "feature": "wday",
+      "importance": 0.02017
+    },
+    {
+      "feature": "lag_42",
+      "importance": 0.0201
+    },
+    {
+      "feature": "sell_price",
+      "importance": 0.01972
+    },
+    {
+      "feature": "week_of_year",
+      "importance": 0.01649
+    },
+    {
+      "feature": "month",
+      "importance": 0.01498
+    },
+    {
+      "feature": "price_ratio",
+      "importance": 0.01396
+    },
+    {
+      "feature": "store_id_code",
+      "importance": 0.01338
+    },
+    {
+      "feature": "is_weekend",
+      "importance": 0.00837
+    },
+    {
+      "feature": "event_flag",
+      "importance": 0.00685
+    },
+    {
+      "feature": "day_of_month",
+      "importance": 0.00665
+    },
+    {
+      "feature": "snap",
+      "importance": 0.00551
+    }
+  ]
+}

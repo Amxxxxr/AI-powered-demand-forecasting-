@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DemandAI – Retail Demand Forecasting</title>
+<script src="/static/chart.umd.js"></script>
+<style>
+:root{--bg:#0b1426;--panel:#121f38;--panel2:#18294a;--line:#27406b;--text:#e8eefb;--mute:#9db0d0;--accent:#4fd1c5;--warn:#f6ad55;--bad:#fc8181;--c1:#4fd1c5;--c2:#63b3ed;--c3:#f6ad55;--c4:#b794f4}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif}
+header{padding:22px clamp(16px,4vw,40px) 8px}
+h1{margin:0;font-size:26px;letter-spacing:.2px}h2{font-size:16px;margin:0 0 10px;font-weight:600}
+.sub{color:var(--mute);margin:4px 0 0;max-width:75ch}
+main{padding:12px clamp(16px,4vw,40px) 40px;max-width:1500px;margin:auto}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px}
+label{display:flex;flex-direction:column;font-size:12.5px;color:var(--mute);gap:4px}
+select,input,button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;min-width:130px}
+button{cursor:pointer;background:var(--accent);color:#06222a;border:0;font-weight:600}button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi small{color:var(--mute);display:block;font-size:12.5px}.kpi b{font-size:22px;display:block;margin-top:2px;word-break:break-word}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.card.wide{grid-column:1/-1}.chart{position:relative;height:280px}
+.note{color:var(--mute);font-size:12.5px;margin:6px 0 0}
+.banner{display:none;border-radius:8px;padding:12px 14px;margin-bottom:14px;border:1px solid}
+.banner.err{display:block;background:#3a1b24;border-color:var(--bad)}.banner.info{display:block;background:#1d2c4d;border-color:var(--c2)}
+.loading{opacity:.55;pointer-events:none}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{cursor:pointer;color:var(--mute);position:sticky;top:0;background:var(--panel)}th:hover{color:var(--text)}
+.tw{max-height:340px;overflow:auto}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+.mt{margin-top:16px}
+#chat{display:flex;flex-direction:column;gap:12px}
+#log{height:380px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:4px}
+.msg{max-width:min(78ch,92%);padding:10px 12px;border-radius:10px;border:1px solid var(--line);white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:#1b4a54;border-color:#2b7a86}.msg.bot{align-self:flex-start;background:var(--panel2)}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;margin-bottom:4px;border:1px solid}
+.tag.v{color:var(--accent);border-color:var(--accent)}.tag.a{color:var(--c4);border-color:var(--c4)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chips button{min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--line);font-weight:400;font-size:13px}
+.send{display:flex;gap:8px}.send input{flex:1}
+@media (max-width:600px){.chart{height:240px}select,input{min-width:0;width:100%}label{flex:1 1 140px}}
+@media (prefers-reduced-motion:no-preference){.kpi b{transition:opacity .2s}}
+</style>
+</head>
+<body>
+<header>
+  <h1>DemandAI</h1>
+  <p class="sub">28-day retail demand forecasts from the Walmart M5 dataset. Compare a seasonal-naive baseline, XGBoost and LSTM, then ask the assistant below about what you see.</p>
+</header>
+<main>
+  <div id="banner" class="banner" role="status"></div>
+
+  <section class="bar" aria-label="Filters">
+    <label>Category <select id="f-cat"><option value="">All</option></select></label>
+    <label>Store <select id="f-store"><option value="">All</option></select></label>
+    <label>Item <select id="f-item"><option value="">All</option></select></label>
+    <label>History from <input type="date" id="f-start"></label>
+    <label>History to <input type="date" id="f-end"></label>
+    <label>Model <select id="f-model"></select></label>
+    <label>Forecast horizon <select id="f-h"><option value="28">28 days (trained horizon)</option></select></label>
+    <button id="reset" class="ghost">Reset filters</button>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+  <section class="grid" id="dash">
+    <div class="card"><h2>Historical sales</h2><div class="chart"><canvas id="c-hist"></canvas></div><p class="note">Daily units for the selection with a 7-day moving average (SQL window function).</p></div>
+    <div class="card"><h2>Actual vs predicted (test window)</h2><div class="chart"><canvas id="c-test"></canvas></div><p class="note" id="n-test">Last 28 observed days, never used for training. Predictions were made from the day before.</p></div>
+    <div class="card"><h2>Future 28-day forecast</h2><div class="chart"><canvas id="c-fut"></canvas></div><p class="note">Point forecast, not a guarantee of demand.</p></div>
+    <div class="card"><h2>Demand comparison</h2>
+      <div class="row"><label>Compare by <select id="by"><option value="item_id">Item</option><option value="cat_id">Category</option><option value="store_id">Store</option></select></label></div>
+      <div class="chart" style="height:230px"><canvas id="c-perf"></canvas></div><p class="note">Top 10 by total units in the selected history window.</p></div>
+    <div class="card"><h2>Model performance (test window)</h2><div class="chart" style="height:200px"><canvas id="c-model"></canvas></div><div class="tw" id="model-table"></div>
+      <p class="note" id="model-note"></p></div>
+    <div class="card"><h2>Weekly pattern</h2><div class="chart"><canvas id="c-week"></canvas></div><p class="note">Average total units per weekday.</p></div>
+
+    <div class="card wide"><h2>Forecast table</h2>
+      <div class="row"><label>Show <select id="t-split"><option value="future">Future forecast</option><option value="test">Test predictions</option></select></label>
+        <label>Search <input id="t-q" placeholder="item, store, date"></label>
+        <a id="csv"><button class="ghost" type="button">Download CSV</button></a><span class="note" id="t-count"></span></div>
+      <div class="tw"><table><thead><tr id="t-head"></tr></thead><tbody id="t-body"></tbody></table></div></div>
+
+    <div class="card wide"><h2>Inventory planning (optional)</h2>
+      <p class="note" style="margin:0 0 10px">Sales data cannot reveal your stock. Enter your own values for the current selection and model.</p>
+      <div class="row">
+        <label>Lead time (days)<input id="i-lead" type="number" min="1" value="7"></label>
+        <label>Service level (0.5–0.999)<input id="i-sl" type="number" step="0.01" value="0.95"></label>
+        <label>Current stock (units)<input id="i-stock" type="number" min="0" placeholder="required"></label>
+        <label>On order (units)<input id="i-ord" type="number" min="0" value="0"></label>
+        <label>Min order qty<input id="i-moq" type="number" min="0" value="0"></label>
+        <label>Review period (days)<input id="i-rev" type="number" min="1" value="7"></label>
+        <button id="i-go">Calculate</button></div>
+      <div id="i-out" class="note"></div></div>
+  </section>
+
+  <section class="card mt" id="chat" aria-label="AI assistant">
+    <h2>Ask DemandAI</h2>
+    <p class="note" style="margin:0">Answers use your current filters. Numbers come from verified data queries; any AI text only rephrases them.</p>
+    <div class="chips" id="chips"></div>
+    <div id="log" aria-live="polite"></div>
+    <div class="send"><input id="q" maxlength="1000" placeholder="Ask about products, stores, forecasts or metrics…" aria-label="Your question"><button id="send">Send</button><button id="clear" class="ghost">Clear</button></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+if (typeof Chart === "undefined") {
+  const b = $("#banner"); b.className = "banner err";
+  b.textContent = "Could not load the charts library. Open the page through the backend (http://127.0.0.1:5000), not as a file, and check that static/chart.umd.js exists.";
+  throw new Error("Chart.js missing");
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n, d = 0) => n == null || isNaN(n) ? "n/a" : Number(n).toLocaleString(undefined, {maximumFractionDigits: d});
+const COLORS = ["#4fd1c5", "#63b3ed", "#f6ad55", "#b794f4"];
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const charts = {};
+let opts = null, tableRows = [], sort = {k: "date", asc: true};
+Chart.defaults.color = "#9db0d0"; Chart.defaults.borderColor = "#27406b";
+
+async function api(path, params = {}, init) {
+  const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+  let r;
+  try { r = await fetch("/api" + path + (qs ? "?" + qs : ""), init); }
+  catch { throw new Error("Cannot reach the backend. Start it with: python -m backend.app"); }
+  let j; try { j = await r.json(); } catch { throw new Error("The server sent an unreadable response."); }
+  if (!r.ok) throw new Error(j?.error?.message || "Request failed (" + r.status + ")");
+  return j;
+}
+const banner = (msg, kind = "err") => { const b = $("#banner"); b.className = "banner " + (msg ? kind : ""); b.textContent = msg || ""; };
+const filters = () => ({cat_id: $("#f-cat").value, store_id: $("#f-store").value, item_id: $("#f-item").value, start: $("#f-start").value, end: $("#f-end").value});
+const model = () => $("#f-model").value;
+
+function draw(id, type, labels, datasets, extra = {}) {
+  charts[id]?.destroy();
+  charts[id] = new Chart($("#" + id), {type, data: {labels, datasets}, options: {responsive: true, maintainAspectRatio: false, interaction: {mode: "index", intersect: false},
+    plugins: {legend: {labels: {boxWidth: 12}}}, scales: {x: {ticks: {maxTicksLimit: 8}}, y: {beginAtZero: true}}, ...extra}});
+}
+const line = (label, data, i, o = {}) => ({label, data, borderColor: COLORS[i], backgroundColor: COLORS[i], pointRadius: 0, borderWidth: 2, tension: .2, ...o});
+
+async function init() {
+  try {
+    const h = (await api("/health")).data;
+    if (!h.data_ready) { banner("Setup needed: no data or forecasts found. Run `python run_pipeline.py`, then reload this page.", "info"); return; }
+    opts = (await api("/filters")).data;
+  } catch (e) { banner(e.message); return; }
+  const fill = (id, items) => items.forEach(v => $(id).add(new Option(v.label ?? v, v.value ?? v)));
+  fill("#f-cat", opts.categories); fill("#f-store", opts.stores); fill("#f-item", opts.items.map(i => i.item_id));
+  opts.models.forEach(m => $("#f-model").add(new Option(m.replace("_", " "), m)));
+  if (opts.models.includes("xgboost")) $("#f-model").value = "xgboost";
+  $("#f-start").min = $("#f-end").min = opts.history_start; $("#f-start").max = $("#f-end").max = opts.history_end;
+  $("#f-cat").onchange = () => { const c = $("#f-cat").value; $("#f-item").innerHTML = '<option value="">All</option>';
+    opts.items.filter(i => !c || i.cat_id === c).forEach(i => $("#f-item").add(new Option(i.item_id, i.item_id))); refresh(); };
+  ["#f-store", "#f-item", "#f-start", "#f-end", "#f-model"].forEach(s => $(s).onchange = refresh);
+  $("#by").onchange = loadPerf; $("#t-split").onchange = loadTable; $("#t-q").oninput = renderTable;
+  $("#reset").onclick = () => { ["#f-cat", "#f-store", "#f-item", "#f-start", "#f-end"].forEach(s => $(s).value = ""); $("#f-cat").onchange(); };
+  refresh();
+}
+
+async function refresh() {
+  banner(""); $("#dash").classList.add("loading");
+  try { await Promise.all([loadKpis(), loadHist().then(loadForecasts), loadPerf(), loadModels(), loadTable()]); }
+  catch (e) { banner(e.message); }
+  $("#dash").classList.remove("loading");
+}
+
+async function loadKpis() {
+  const d = (await api("/summary", {...filters(), model: model()})).data, k = d.kpis, m = d.selection_metrics;
+  const sel = [filters().item_id, filters().store_id, filters().cat_id].filter(Boolean).join(" / ") || "All";
+  const cards = [
+    ["Total units sold", fmt(k.total_units), "Sum of daily sales in the selected history window."],
+    ["Average daily demand", fmt(k.avg_daily_units, 1), "Total units / number of days (all selected series combined)."],
+    ["Selection", sel, "Current filters."], ["Forecast horizon", d.horizon_days + " days", "Days ahead the models predict."],
+    ["Model", d.model.replace("_", " "), "Model used for forecast views and KPIs."],
+    ["MAE", m ? fmt(m.MAE, 3) : "n/a", "Mean absolute error per item-store-day on the test window, for this selection."],
+    ["RMSE", m ? fmt(m.RMSE, 3) : "n/a", "Root mean squared error on the test window, for this selection."],
+    ["WAPE", m && !isNaN(m.WAPE) ? fmt(m.WAPE, 1) + "%" : "n/a", "Sum of absolute errors / sum of actual units on the test window."]];
+  $("#kpis").innerHTML = cards.map(c => `<div class="kpi" title="${esc(c[2])}"><small>${esc(c[0])}</small><b>${esc(c[1])}</b></div>`).join("");
+}
+
+async function loadHist() {
+  const d = (await api("/historical-sales", filters())).data;
+  if (!d.daily.length) { draw("c-hist", "line", [], []); banner("No sales for this selection and date range.", "info"); return; }
+  draw("c-hist", "line", d.daily.map(r => r.date), [line("Daily units", d.daily.map(r => r.units), 1, {borderWidth: 1}), line("7-day average", d.daily.map(r => r.ma7), 0)]);
+  const w = DAYS.map((_, i) => d.weekday.find(r => r.dow === i)?.avg_units ?? null);
+  draw("c-week", "bar", DAYS, [{label: "Avg units", data: w, backgroundColor: COLORS[0]}]);
+  window._tail = d.daily.slice(-56);
+}
+
+async function loadForecasts() {
+  const f = {...filters(), model: model()};
+  const [t, u] = await Promise.all([api("/forecast", {...f, split: "test", limit: 1}), api("/forecast", {...f, split: "future", limit: 1})]);
+  draw("c-test", "line", t.data.daily.map(r => r.date), [line("Actual", t.data.daily.map(r => r.actual), 2), line("Predicted (" + model() + ")", t.data.daily.map(r => r.prediction), 0, {borderDash: [6, 3]})]);
+  const tail = window._tail || [], labels = [...tail.map(r => r.date), ...u.data.daily.map(r => r.date)];
+  draw("c-fut", "line", labels, [line("Recent actual", [...tail.map(r => r.units), ...u.data.daily.map(() => null)], 2),
+    line("Forecast", [...tail.map(() => null), ...u.data.daily.map(r => r.prediction)], 0, {borderDash: [6, 3]})]);
+}
+
+async function loadPerf() {
+  const by = $("#by").value, d = (await api("/product-performance", {...filters(), by, limit: 10})).data;
+  draw("c-perf", "bar", d.map(r => r.key), [{label: "Units", data: d.map(r => r.units), backgroundColor: COLORS[1]}], {indexAxis: "y"});
+}
+
+async function loadModels() {
+  const d = (await api("/model-metrics", filters())).data, src = d.selection || d.models, names = Object.keys(src);
+  const use = names.filter(n => src[n]);
+  draw("c-model", "bar", use.map(n => n.replace("_", " ")), [
+    {label: "MAE", data: use.map(n => src[n].MAE), backgroundColor: COLORS[0]}, {label: "RMSE", data: use.map(n => src[n].RMSE), backgroundColor: COLORS[2]}]);
+  $("#model-table").innerHTML = "<table><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>WAPE</th></tr>" +
+    use.map(n => `<tr><td>${esc(n.replace("_", " "))}</td><td>${fmt(src[n].MAE, 3)}</td><td>${fmt(src[n].RMSE, 3)}</td><td>${fmt(src[n].WAPE, 1)}%</td></tr>`).join("") + "</table>";
+  $("#model-note").textContent = `Scored on identical rows, ${d.test_start} to ${d.test_end}` + (d.selection ? " (current filters)." : ` (${fmt(d.n_series)} series).`) + " Lower is better; ranking applies to this window only.";
+}
+
+const COLS = [["date", "Date"], ["item_id", "Item"], ["store_id", "Store"], ["cat_id", "Category"], ["prediction", "Predicted units"], ["actual", "Actual units"], ["model", "Model"]];
+async function loadTable() {
+  const split = $("#t-split").value, p = {...filters(), model: model(), split};
+  const r = await api("/forecast", {...p, limit: 5000});
+  tableRows = r.data.rows; $("#csv").href = "/api/forecast.csv?" + new URLSearchParams(Object.entries(p).filter(([, v]) => v));
+  $("#t-head").innerHTML = COLS.map(([k, l]) => `<th data-k="${k}">${l}${sort.k === k ? (sort.asc ? " ▲" : " ▼") : ""}</th>`).join("");
+  $("#t-head").querySelectorAll("th").forEach(th => th.onclick = () => { sort = {k: th.dataset.k, asc: sort.k === th.dataset.k ? !sort.asc : true}; renderTable(); });
+  $("#t-count").textContent = `${fmt(r.meta.total_rows)} rows · ${r.meta.label}`; renderTable();
+}
+function renderTable() {
+  const q = $("#t-q").value.toLowerCase();
+  let rows = tableRows.filter(r => !q || Object.values(r).join(" ").toLowerCase().includes(q));
+  rows.sort((a, b) => (a[sort.k] > b[sort.k] ? 1 : a[sort.k] < b[sort.k] ? -1 : 0) * (sort.asc ? 1 : -1));
+  $("#t-body").innerHTML = rows.slice(0, 300).map(r => "<tr>" + COLS.map(([k]) => `<td>${esc(r[k] == null ? "–" : r[k])}</td>`).join("") + "</tr>").join("") || '<tr><td colspan="7">No rows match.</td></tr>';
+  $("#t-head").querySelectorAll("th").forEach((th, i) => th.textContent = COLS[i][1] + (sort.k === COLS[i][0] ? (sort.asc ? " ▲" : " ▼") : ""));
+}
+
+$("#i-go").onclick = async () => {
+  const v = id => $(id).value === "" ? null : Number($(id).value), out = $("#i-out");
+  out.textContent = "Calculating…";
+  try {
+    const r = (await api("/inventory", {}, {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({context: {...filters(), model: model()}, lead_time_days: v("#i-lead"), service_level: v("#i-sl"), current_stock: v("#i-stock"), on_order: v("#i-ord"), moq: v("#i-moq"), review_days: v("#i-rev")})})).data;
+    out.innerHTML = `<b>Recommended order: ${fmt(r.recommended_order_qty, 1)} units</b> · reorder point ${fmt(r.reorder_point, 1)} · safety stock ${fmt(r.safety_stock, 1)} · order-up-to ${fmt(r.order_up_to_level, 1)}<br>` + r.assumptions.map(esc).join("<br>");
+  } catch (e) { out.textContent = e.message; }
+};
+
+/* ---------- chat ---------- */
+const SUGGEST = ["Which product has the highest demand?", "What is the predicted demand for the next 28 days?", "Which store has the highest sales?", "Why is demand expected to increase?",
+  "How does LSTM compare with XGBoost?", "What does the WAPE metric mean?", "Which products show irregular demand?", "What are the limitations of this forecast?", "What inventory-planning considerations should the business examine?"];
+const log = $("#log");
+function add(cls, html) { const d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html; log.append(d); log.scrollTop = log.scrollHeight; return d; }
+function greet() { log.innerHTML = ""; add("bot", "Hi! Ask me about sales, the 28-day forecast or model accuracy. I use your current filters."); }
+async function ask(text) {
+  text = (text || $("#q").value).trim(); if (!text) return;
+  $("#q").value = ""; const m = document.createElement("div"); m.className = "msg user"; m.textContent = text; log.append(m);
+  const wait = add("bot", "Thinking…"); $("#send").disabled = true;
+  try {
+    const r = (await api("/chat", {}, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({message: text, context: {...filters(), model: model()}})})).data;
+    wait.innerHTML = `<span class="tag v">Verified from data</span><br>${esc(r.verified_answer)}` + (r.ai_explanation ? `<br><br><span class="tag a">AI explanation (generated)</span><br>${esc(r.ai_explanation)}` : "");
+  } catch (e) { wait.textContent = "Sorry, I couldn't answer: " + e.message; }
+  $("#send").disabled = false; log.scrollTop = log.scrollHeight;
+}
+$("#chips").innerHTML = SUGGEST.map(s => `<button type="button">${esc(s)}</button>`).join("");
+$("#chips").onclick = e => e.target.tagName === "BUTTON" && ask(e.target.textContent);
+$("#send").onclick = () => ask(); $("#q").onkeydown = e => { if (e.key === "Enter") ask(); };
+$("#clear").onclick = greet; greet(); init();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "avg_units_event_days": 8.164587394411956,
+  "avg_units_normal_days": 8.509729789224588,
+  "median_zero_share_per_series": 0.14794520547945206,
+  "series_with_over_50pct_zero_days": 16,
+  "median_within_series_price_sales_corr": -0.0053343656148689845,
+  "note": "Correlations are descriptive, not causal."
+}

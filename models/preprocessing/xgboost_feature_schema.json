@@ -1,0 +1,33 @@
+{
+  "features": [
+    "lag_28",
+    "lag_35",
+    "lag_42",
+    "roll_mean_7",
+    "roll_mean_28",
+    "roll_std_28",
+    "roll_zero_share_28",
+    "sell_price",
+    "price_ratio",
+    "dow",
+    "wday",
+    "month",
+    "day_of_month",
+    "week_of_year",
+    "is_weekend",
+    "event_flag",
+    "snap",
+    "store_id_code",
+    "item_id_code",
+    "cat_id_code",
+    "dept_id_code"
+  ],
+  "doc": {
+    "lag_28/35/42": "Sales 28/35/42 days earlier (same weekday). Known at forecast time for all 28 horizon days.",
+    "roll_mean_7/28, roll_std_28, roll_zero_share_28": "Rolling stats of sales shifted by 28 days: recent level, volatility, intermittency.",
+    "sell_price, price_ratio": "Planned price and price vs its recent average. Prices are set by the retailer ahead of time.",
+    "dow, wday, month, day_of_month, week_of_year, is_weekend": "Calendar facts, always known in advance.",
+    "event_flag, snap": "Holiday/event and SNAP food-stamp days from the calendar, published in advance.",
+    "*_code": "Integer codes for store, item, category, department (fixed identifiers, not derived from sales)."
+  }
+}

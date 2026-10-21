@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+*.log
+node_modules/
+.DS_Store
+data/raw/sell_prices.csv
+data/raw/sales_train_validation.csv
+data/raw/sales_train_evaluation.csv
+.env
